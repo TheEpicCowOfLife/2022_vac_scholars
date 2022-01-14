@@ -8,8 +8,10 @@ float min_val = 999999;
 float max_val = -999999;
 colourLegend cl;
 int cur_it = 0;
-String filename = "20fail.out";
+String filename = "20success.out";
 boolean roundMode = false;
+boolean recording = false;
+int cur_movie = 0;
 void setup() {
   fullScreen();
   heightf = height;
@@ -47,7 +49,7 @@ void setup() {
   catch (IOException e) {
     e.printStackTrace();
   }
-  cl = new colourLegend(n * 50 + 100, n * 25, 30, n * 50, min_val,max_val, "Lol");
+  cl = new colourLegend(n * 50 + 100, n * 25, 30, n * 50, min_val,max_val, "");
   println(min_val);
   println(max_val);
 }
@@ -72,7 +74,9 @@ void draw() {
   }
   cl.render_bar();
   cl.render_labels();
-  text(str(cur_it),0, n * 50);
+  textSize(40);
+  textAlign(LEFT);
+  text("Current tick: " + str(cur_it),0, n * 50 + 60);
   
   for (int i = 0; i < n; i++){
     int hcnt = 0;
@@ -86,7 +90,7 @@ void draw() {
     strokeWeight(3);
     if (hcnt != m){
       fill(0,255,255);
-      line(0, i * 50 + 25, -25, i * 50 + 25);
+      line(0, i * 50 + 25, -20, i * 50 + 25);
     }
     if (vcnt != m){
       fill(0,255,255);
@@ -113,6 +117,22 @@ void draw() {
       line((n-i-1) * 50, 0, (n-i-1) * 50 - 20, -20);
     }
     stroke(0,0,0);
-    strokeWeight(1);
+    strokeWeight(2);
+  }
+  if (recording){
+    if (cur_it == 0 || cur_it == num_iterations-1){
+      for (int i = 0; i < 10; i++){
+        saveFrame("outputs" + str(cur_movie) + "/####.png");
+      }
+    }
+    else{
+      saveFrame("outputs" + str(cur_movie) + "/####.png");
+    }
+    if (cur_it == num_iterations-1){
+      recording = false;
+    }
+    else{
+      cur_it++;
+    }
   }
 }

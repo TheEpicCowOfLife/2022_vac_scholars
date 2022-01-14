@@ -5,15 +5,17 @@
 #include <utility>
 #include <time.h>
 #include <chrono>
+#include <cmath>
 using namespace std;
 using namespace std::chrono;
 int m;
 int N;
 
-bool doRandomisation = true;
+bool doRandomisation = false;
 bool projectCheckingOptimisation = true;
-
-
+bool calcDist = true;
+char * distFilename = "output.txt";
+FILE * distFile;
 const int NUM_TICKS = 5000;
 inline int myRound(float x){
     if (x >= 0.5){
@@ -291,6 +293,15 @@ class Board{
             printf("\n");
         }
     }
+    float normSquared(){
+        float d = 0;
+        for (int i = 0; i < n; i++){
+            for (int j = 0; j < n; j++){
+                d += b[i][j] * b[i][j];
+            }
+        }
+        return d;
+    }
 };
 
 
@@ -318,10 +329,12 @@ Result doBoard(int seed, bool output, FILE * output_file){
     if (output){
         fprintf(output_file, "%d\n", N);
     }
+    if (calcDist){
+        distFile = fopen(distFilename,"w");
+    }
+
     srand(seed);
-    long long start = duration_cast< milliseconds >(
-        system_clock::now().time_since_epoch()
-    ).count();
+    long long start = getMillis();
 
     boards[0][0] = Board(N,true);
     for (int i = 1; i < 4; i++){
@@ -333,6 +346,16 @@ Result doBoard(int seed, bool output, FILE * output_file){
 
         avg =  (boards[k%2][0] + boards[k%2][1] + boards[k%2][2] + boards[k%2][3]) * 0.25;
         
+        if (calcDist){
+            float d = 
+            (avg - avg.projectHorizontal(true)).normSquared() +
+            (avg - avg.projectVertical(true)).normSquared() +
+            (avg - avg.projectDiagonal1(true)).normSquared() +
+            (avg - avg.projectDiagonal2(true)).normSquared()
+            ;            
+            fprintf(distFile, "%f\n", d);
+        }
+
         if (output){
             for (int y = 0; y < N; y++){
                 for (int x = 0; x < N; x++){
@@ -418,5 +441,7 @@ int main(){
 
     printf("Enter N, M:");
     scanf("%d %d", &N, &m);
-    runTrials();    
+    doBoard(666109);
+    // runTrials();    
+
 }

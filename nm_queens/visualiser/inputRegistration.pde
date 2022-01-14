@@ -13,14 +13,20 @@ void mouseWheel(MouseEvent event) {
 }
 
 void keyPressed(){
-  if (key == 'w'){
-    cur_it = min(num_iterations-1, cur_it+1);
-  }
-  else if(key == 'q'){
-    cur_it = max(0, cur_it - 1);
-  }
-  else if (key == 'e'){
-    roundMode ^= true; 
-  }
-  
+  if (!recording){
+    if (key == 'r'){
+      recording = true;
+      cur_movie++;
+      cur_it = 0;
+    }
+    else if (key == 'w'){
+      cur_it = min(num_iterations-1, cur_it+1);
+    }
+    else if(key == 'q'){
+      cur_it = max(0, cur_it - 1);
+    }
+    else if (key == 'e'){
+      roundMode ^= true; 
+    }
+  }  
 }
