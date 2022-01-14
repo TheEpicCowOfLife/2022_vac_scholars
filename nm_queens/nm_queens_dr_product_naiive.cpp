@@ -4,24 +4,40 @@
 #include <algorithm>
 #include <utility>
 #include <time.h>
+#include <chrono>
 using namespace std;
-
+using namespace std::chrono;
 int m;
 int N;
-const int NUM_TICKS = 3000;
-int myRound(float x){
-    if (x > 0.5){
+
+bool doRandomisation = true;
+bool projectCheckingOptimisation = true;
+
+
+const int NUM_TICKS = 5000;
+inline int myRound(float x){
+    if (x >= 0.5){
         return 1;
     }
     return 0;
 }
-vector<float> projS(vector<float> &v, bool discrete){
+
+float randFloat(float l, float h){
+    float x =(float) rand();
+    return (h - l) * (x/(float)RAND_MAX) + l;
+}
+inline vector<float> projS(vector<float> &v, bool discrete){
     int n = v.size();
     vector<float> res(n,0);
     if (discrete){
         vector<pair<float,int>> temp;
         for (int i = 0; i < n; i++){
-            temp.push_back({v[i],i});
+            if (doRandomisation){
+                temp.push_back({v[i] + randFloat(0,0.01),i});
+            }
+            else{
+                temp.push_back({v[i],i});
+            }
         }
         sort(temp.begin(),temp.end());
         for (int i = n-m; i < n; i++){
@@ -40,14 +56,19 @@ vector<float> projS(vector<float> &v, bool discrete){
     return res;
 
 }
-vector<float> projH(vector<float> &v, bool discrete){
+inline vector<float> projH(vector<float> &v, bool discrete){
     int n = v.size();
     vector<float> res(n,0);
     
     if (discrete){
         vector<pair<float,int>> temp;
         for (int i = 0; i < n; i++){
-            temp.push_back({v[i],i});
+            if (doRandomisation){
+                temp.push_back({v[i] + randFloat(0,0.01),i});
+            }
+            else{
+                temp.push_back({v[i],i});
+            }
         }
         sort(temp.begin(),temp.end());
         for (int i = n-m; i < n; i++){
@@ -171,7 +192,7 @@ class Board{
         return result;
     }
 
-    bool check(){
+    bool check(bool debug){
         bool res = true;
         for (int i = 0; i < n; i++){
             int hcnt = 0;
@@ -181,11 +202,21 @@ class Board{
                 vcnt += myRound(b[i][j]);
             }
             if (hcnt != m){
-                printf("Failed horizontal\n");
+                if (debug){
+                    printf("Failed horizontal\n");
+                }
+                else{
+                    return false;
+                }
                 res = false;
             }
             if (vcnt != m){
-                printf("Failed vertical\n");
+                if (debug){
+                    printf("Failed vertical\n");
+                }
+                else{
+                    return false;
+                }
                 res = false;
 
             }
@@ -201,7 +232,13 @@ class Board{
             }
             for (int j = 0; j < 4; j++){
                 if (cnt[j] > m){
-                    printf("Failed diag %d\n", j);
+                    if (debug){
+                        printf("Failed diag %d\n", j);
+
+                    }
+                    else{
+                        return false;
+                    }
                     res = false;
                 }
             }
@@ -264,11 +301,28 @@ Board toProject[4];
 
 Board projected[4];
 
-int main(){
-    printf("Enter N and M: ");
-    scanf("%d %d", &N, &m);
+struct Result{
+    bool success;
+    int iterations;
+    long long milliseconds;
+};
 
-    srand(time(NULL));
+long long getMillis(){
+    return  duration_cast< milliseconds >(
+                system_clock::now().time_since_epoch()
+            ).count();
+}
+
+Result doBoard(int seed, bool output, FILE * output_file){
+
+    if (output){
+        fprintf(output_file, "%d\n", N);
+    }
+    srand(seed);
+    long long start = duration_cast< milliseconds >(
+        system_clock::now().time_since_epoch()
+    ).count();
+
     boards[0][0] = Board(N,true);
     for (int i = 1; i < 4; i++){
         boards[0][i] = boards[0][0];
@@ -278,6 +332,33 @@ int main(){
         Board avg(N,false);
 
         avg =  (boards[k%2][0] + boards[k%2][1] + boards[k%2][2] + boards[k%2][3]) * 0.25;
+        
+        if (output){
+            for (int y = 0; y < N; y++){
+                for (int x = 0; x < N; x++){
+                    fprintf(output_file, "%f ", avg.b[x][y]);
+                    
+                }
+                fprintf(output_file,"\n");
+            }
+        }
+        bool check;
+        if (projectCheckingOptimisation){
+            check = avg.projectVertical(true).check(false);
+        }
+        else{
+            check = avg.check(false);
+        }
+        if (check){
+
+
+            long long end = getMillis();
+            if (output){
+                fprintf(output_file,"-999999\n");
+            }
+            return {true,k, end - start};
+        }
+
         for (int i = 0; i < 4; i++){
             toProject[i] = avg * 2 - boards[k%2][i]; 
         }
@@ -290,13 +371,52 @@ int main(){
             boards[(k+1)%2][i] = boards[k%2][i] * 0.5 + projected[i] - toProject[i] * 0.5;
         }
     }
-    Board ans;
-    for (int i = 0; i < 4; i++){
-        ans = ans + boards[NUM_TICKS%2][i];
-    // ans.print(true);
-
+    if (output){
+        fprintf(output_file,"-999999\n");
     }
-    ans = ans * 0.25;
-    ans.check();
-    ans.print(false);
+    return {false,0, getMillis() - start};
+}
+
+Result doBoard(int seed){
+    FILE * file;
+    return doBoard(seed,false,file);
+}
+
+char temps[105];
+char filename[10005];
+
+void runTrials(){
+    double avg_it = 0;
+    int num_success = 0;
+    int num_trials = 100;
+    double avg_time = 0;
+    srand(time(NULL));
+    int s = rand() % 1000000;
+    for (int i = s; i < num_trials+s; i++){
+        Result r = doBoard(i);
+        printf("trial %d: %d %d %lld\n", i, r.success, r.iterations, r.milliseconds);
+        if (r.success){
+            avg_it += r.iterations;
+            avg_time += r.milliseconds;
+            num_success++;
+        }   
+    }
+    if (num_success > 0){
+        printf("%d/%d successful, Average: %lf iterations, %lf seconds", 
+        num_success, num_trials, avg_it/(double)num_success, avg_time/(double)num_success / 1000.0 );
+    }
+}
+
+int main(){
+    
+    // printf("Enter N, M, and the output file name: ");
+    // scanf("%d %d %s", &N, &m, temps);
+    // sprintf(filename,"visualiser/%s",temps);
+    // FILE * file = fopen(filename, "w");
+    // doBoard(369013,true,file);
+
+
+    printf("Enter N, M:");
+    scanf("%d %d", &N, &m);
+    runTrials();    
 }
