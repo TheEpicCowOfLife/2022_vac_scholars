@@ -8,7 +8,7 @@ float min_val = 999999;
 float max_val = -999999;
 colourLegend cl;
 int cur_it = 0;
-String filename = "20success.out";
+String filename = "20fail.out";
 boolean roundMode = false;
 boolean recording = false;
 int cur_movie = 0;

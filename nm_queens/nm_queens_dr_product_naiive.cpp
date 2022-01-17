@@ -12,11 +12,14 @@ int m;
 int N;
 
 bool doRandomisation = false;
-bool projectCheckingOptimisation = true;
-bool calcDist = true;
+bool projectCheckingOptimisation = false;
+bool calcDist = false;
+bool addNoise = false;
+float noiseMagnitude = 0.01;
+
 char * distFilename = "output.txt";
 FILE * distFile;
-const int NUM_TICKS = 5000;
+const int NUM_TICKS = 1000;
 inline int myRound(float x){
     if (x >= 0.5){
         return 1;
@@ -302,6 +305,13 @@ class Board{
         }
         return d;
     }
+    void addNoise(){
+        for (int i = 0; i < n; i++){
+            for (int j = 0; j < n; j++){
+                b[i][j] += randFloat(-noiseMagnitude,noiseMagnitude);
+            }
+        }
+    }
 };
 
 
@@ -392,6 +402,9 @@ Result doBoard(int seed, bool output, FILE * output_file){
         projected[3] = toProject[3].projectDiagonal2(true);
         for (int i = 0; i < 4; i++){
             boards[(k+1)%2][i] = boards[k%2][i] * 0.5 + projected[i] - toProject[i] * 0.5;
+            if (addNoise){
+                boards[(k+1)%2][i].addNoise();
+            }
         }
     }
     if (output){
@@ -408,14 +421,12 @@ Result doBoard(int seed){
 char temps[105];
 char filename[10005];
 
-void runTrials(){
+void runTrials(int seed){
     double avg_it = 0;
     int num_success = 0;
     int num_trials = 100;
     double avg_time = 0;
-    srand(time(NULL));
-    int s = rand() % 1000000;
-    for (int i = s; i < num_trials+s; i++){
+    for (int i = seed; i < num_trials+seed; i++){
         Result r = doBoard(i);
         printf("trial %d: %d %d %lld\n", i, r.success, r.iterations, r.milliseconds);
         if (r.success){
@@ -430,18 +441,23 @@ void runTrials(){
     }
 }
 
+void runTrials(){
+    srand(time(NULL));
+    runTrials(rand() % 1000000);
+}
+
 int main(){
+    int seed;
     
-    // printf("Enter N, M, and the output file name: ");
-    // scanf("%d %d %s", &N, &m, temps);
-    // sprintf(filename,"visualiser/%s",temps);
-    // FILE * file = fopen(filename, "w");
-    // doBoard(369013,true,file);
+    printf("Enter N, M, seed, and the output file name: ");
+    scanf("%d %d %d %s", &N, &m, &seed, temps);
+    sprintf(filename,"visualiser/%s",temps);
+    FILE * file = fopen(filename, "w");
+    doBoard(seed,true,file);
 
-
-    printf("Enter N, M:");
-    scanf("%d %d", &N, &m);
-    doBoard(666109);
-    // runTrials();    
+    // printf("Enter N, M, seed:");
+    // scanf("%d %d %d", &N, &m, &seed);
+    // doBoard(666109);
+    // runTrials(seed);    
 
 }
