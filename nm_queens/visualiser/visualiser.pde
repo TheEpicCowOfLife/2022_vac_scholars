@@ -8,7 +8,7 @@ float min_val = 999999;
 float max_val = -999999;
 colourLegend cl;
 int cur_it = 0;
-String filename = "20fail.out";
+String filename = "20success.out";
 boolean roundMode = false;
 boolean recording = false;
 int cur_movie = 0;
@@ -122,11 +122,11 @@ void draw() {
   if (recording){
     if (cur_it == 0 || cur_it == num_iterations-1){
       for (int i = 0; i < 10; i++){
-        saveFrame("outputs" + str(cur_movie) + "/####.png");
+        saveFrame("recordings/outputs" + str(cur_movie) + "/####.png");
       }
     }
     else{
-      saveFrame("outputs" + str(cur_movie) + "/####.png");
+      saveFrame("recordings/outputs" + str(cur_movie) + "/####.png");
     }
     if (cur_it == num_iterations-1){
       recording = false;
