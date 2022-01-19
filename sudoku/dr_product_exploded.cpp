@@ -12,23 +12,37 @@ using namespace std::chrono;
 
 const int NUM_TICKS = 10000;
 const int n = 9;
-
+// To slightly save on storage, we output the board floats as ints: multiplied by this outputFactor.
+const int outputFactor = 100; 
 
 // char fileName[1005] = "data/puzzles0_kaggle";
-// char fileName[1005] = "data/puzzles2_17_clue";
+char fileName[1005] = "data/puzzles2_17_clue";
 
-char fileName[1005] = "data/puzzles3_magictour_top1465";
+// char fileName[1005] = "data/puzzles3_magictour_top1465";
 // char fileName[105] = "data/puzzles6_forum_hardest_1106";
 
 
 bool doRandomisation = false;
+const int maxBoardsScanned = 100; 
+int boardsScanned = 100;
+int allBoards[maxBoardsScanned][n][n];
 int constraintBoard[n][n];
+
+void setConstraintBoard(int k){
+    FOR2(
+        constraintBoard[i][j] = allBoards[k][i][j];
+    )
+}
 
 inline int myRound(float x){
     if (x >= 0.5){
         return 1;
     }
     return 0;
+}
+
+inline int actuallyCastToIntRound(float x){
+    return (int)round(x);
 }
 
 float randFloat(float l, float h){
@@ -208,8 +222,16 @@ struct Board{
             }
             printf("\n");
         }
-        printf("\n");  
-        
+        printf("\n");          
+    }
+
+    void outputBoard(FILE * outputFile){
+        FOR2(
+            for (int k = 0; k < n; k++){
+                fprintf(outputFile, "%d ", actuallyCastToIntRound(b[i][j][k] * outputFactor));
+            }
+            fprintf(outputFile,"\n");
+        )
     }
 };
 
@@ -226,11 +248,23 @@ long long getMillis(){
 
 Board boards[2][5];
 Board projected[5];
-// Ensure that the constraint board has been filled out first.
-Result doBoard(int seed){
-    // srand(seed);
-    long long start = getMillis();
 
+// precondition: the constraint board has been filled out already.
+Result doBoard(int seed, bool doOutput, FILE * outputFile){
+    srand(seed);
+
+    if (doOutput){
+        fprintf(outputFile,"%d %d\n", n, outputFactor);
+        for (int i = 0; i < n; i++){
+            for (int j = 0; j < n; j++){
+                fprintf(outputFile, "%d ", constraintBoard[i][j]);
+            }
+            fprintf(outputFile, "\n");
+        }
+    }
+
+    long long start = getMillis();
+    int successfulIteration = -1;
     boards[0][0] = Board(true);
     for (int i = 1; i < 5; i++){
         boards[0][i] = boards[0][0];
@@ -238,9 +272,20 @@ Result doBoard(int seed){
     Board avg;
     for (int k = 0; k < NUM_TICKS; k++){
         avg = (boards[k%2][0] + boards[k%2][1] + boards[k%2][2] + boards[k%2][3] + boards[k%2][4]) * 0.2;
+
+        if (doOutput){
+            avg.outputBoard(outputFile);
+        }
         if (avg.projectLine(true,0).check()){
             // avg.projectLine(true,0).printBoard();
-            return {true,k, getMillis() - start};
+            if (successfulIteration == -1){
+                successfulIteration = k;
+            }
+            else if (k >= successfulIteration + 10){
+                fprintf(outputFile, "-999999\n");
+                return {true,successfulIteration, getMillis() - start};
+            }
+
         }
 
         for (int i = 0; i < 4; i++){
@@ -257,23 +302,43 @@ Result doBoard(int seed){
 
 }
 
-FILE * inputFile;
+Result doBoard(int seed){
+    FILE* dummy;
+    return doBoard(seed,false,dummy);
+}
 
-int main(){
-    
-    // vector<float> test = {0.2,  0.1, 0.4};
-    // vector<float> res = projS(test,true);
-    // for (float i : res){
-    //     printf("%f ", i);
-    // }
-    // return 0;
-
-    inputFile = fopen(fileName, "r");
+void doTrials(){
     double avg_it = 0;
     int num_success = 0;
-    int num_trials = 100;
+    int num_trials = boardsScanned;
     double avg_time = 0;
-    for (int _ = 0; _ < num_trials; _++){
+    for (int k = 0; k < boardsScanned; k++){
+        FOR2(
+            constraintBoard[i][j] = allBoards[k][i][j];
+        );
+        Result r = doBoard(k);
+        printf("Trial (and seed) %d: %d %d %lld\n", k, r.success, r.iterations, r.milliseconds);
+        if (r.success){
+            avg_it += r.iterations;
+            avg_time += r.milliseconds;
+            num_success++;
+        }   
+    }
+    if (num_success > 0){
+        printf("%d/%d successful, Average: %lf iterations, %lf seconds\n", 
+        num_success, num_trials, avg_it/(double)num_success, avg_time/(double)num_success / 1000.0 );
+    }
+    fflush(stdout);
+}
+
+FILE * inputFile;
+char outputFilename[155];
+char temps[105];
+int main(){
+
+    // Read in boards
+    inputFile = fopen(fileName, "r");
+    for (int _ = 0; _ < maxBoardsScanned; _++){
         char inputStr[105];
         while (true){
             fscanf(inputFile,"%[^\n]%*c", inputStr);
@@ -281,32 +346,40 @@ int main(){
                 break;
             }
         }
+        if (inputStr[0] == 0){
+            boardsScanned = _;
+            break;
+        }
+        // printf("%s\n", inputStr);
         FOR2(
             if (inputStr[i * n + j] == '.'){
-                constraintBoard[i][j] = -1;
+                allBoards[_][i][j] = -1;
             }
             else{
-                constraintBoard[i][j] = inputStr[i*n+j] - '1';
+                allBoards[_][i][j] = inputStr[i*n+j] - '1';
             }
-            // printf("%d\n", constraintBoard[i][j]);
-
         )
-        // printf("\n");
-        Result r = doBoard(0);
+    }
+    // doTrials();
+    // return 0;
+    printf("Enter output file name, board, and seed: ");
+    int boardNum;
+    int seed;
+    scanf("%s %d %d", temps, &seed, &boardNum);
+    sprintf(outputFilename,"sudokuVis/inputs/%s.txt",temps);
+    if (boardNum >= boardsScanned){
+        printf("bro don't mess with the program like that\n");
+        return 0;
+    }
+    else{
+        FILE * anotherVariableNameForAFile = fopen(outputFilename,"w");
+        setConstraintBoard(boardNum);
+        Result r = doBoard(seed,true, anotherVariableNameForAFile);
         printf("%d %d %lld\n", r.success, r.iterations, r.milliseconds);
-        if (r.success){
-            avg_it += r.iterations;
-            avg_time += r.milliseconds;
-            num_success++;
-        }   
-        
+        fclose(anotherVariableNameForAFile);
+        fflush(stdout);
     }
-    fclose(inputFile);
-    if (num_success > 0){
-        printf("%d/%d successful, Average: %lf iterations, %lf seconds\n", 
-        num_success, num_trials, avg_it/(double)num_success, avg_time/(double)num_success / 1000.0 );
-    }
-    fflush(stdout);
+
 
 
 

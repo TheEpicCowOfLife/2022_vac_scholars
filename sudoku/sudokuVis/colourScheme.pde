@@ -16,7 +16,7 @@ public color map_val_to_colour(float val, float lb, float ub, float alpha){
   return color(
     map(val, lb, ub, 180, 0), // hue
     map(val, lb, ub, 100, 255), // saturation
-    map(val, lb, ub, 20, 255), // brightness
+    map(val, lb, ub, 100, 255), // brightness
     alpha
   );
 }
