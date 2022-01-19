@@ -4,4 +4,4 @@ Basically I'm implementing and benchmarking a bunch of projection algorithms to 
 
 Note: Eigen Library version 3.4 is needed
 
-Sudoku data collated from here https://github.com/t-dillon/tdoku
+Sudoku data collated from here https://github.com/t-dillon/tdoku/blob/master/data.zip
