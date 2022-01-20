@@ -57,6 +57,7 @@ class colourLegend{
       float y = this.y + this.yd/2 - (float)i * (float)this.yd/(float)this.num_labels;
       
       fill(map_val_to_colour(val,this.min_val,this.max_val));
+      noStroke();
       // render a triangle pointing there
       // this function is literally "specify 3 points". Well here goes.
       triangle(

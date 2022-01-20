@@ -28,6 +28,9 @@ int boardsScanned = 100;
 int allBoards[maxBoardsScanned][n][n];
 int constraintBoard[n][n];
 
+const bool defaultDR = false;
+const float alpha = 0.2;
+
 void setConstraintBoard(int k){
     FOR2(
         constraintBoard[i][j] = allBoards[k][i][j];
@@ -247,6 +250,7 @@ long long getMillis(){
 }
 
 Board boards[2][5];
+Board toProject[5];
 Board projected[5];
 
 // precondition: the constraint board has been filled out already.
@@ -282,20 +286,35 @@ Result doBoard(int seed, bool doOutput, FILE * outputFile){
                 successfulIteration = k;
             }
             else if (k >= successfulIteration + 10){
-                fprintf(outputFile, "-999999\n");
+                if (doOutput){
+                    fprintf(outputFile, "-999999\n");
+                }
                 return {true,successfulIteration, getMillis() - start};
             }
 
         }
+        if (defaultDR){
+            for (int i = 0; i < 4; i++){
+                projected[i] = (avg * 2 - boards[k%2][i]).projectLine(true,i);
+            }
+            projected[4] = (avg * 2 - boards[k%2][4]).projectMaster();
 
-        for (int i = 0; i < 4; i++){
-            projected[i] = (avg * 2 - boards[k%2][i]).projectLine(true,i);
+            for (int i = 0; i < 5; i++){
+                boards[(k+1)%2][i] = boards[k%2][i] + projected[i] - avg;
+            }        
         }
-        projected[4] = (avg * 2 - boards[k%2][4]).projectMaster();
-
-        for (int i = 0; i < 5; i++){
-            boards[(k+1)%2][i] = boards[k%2][i] + projected[i] - avg;
-        }        
+        else{
+            for (int i = 0; i < 5; i++){
+                toProject[i] = (avg * 2 - boards[k%2][i]);
+            }
+            for (int i = 0; i < 4; i++){
+                projected[i] =toProject[i].projectLine(true,i);
+            }
+            projected[4] = toProject[4].projectMaster();
+            for (int i = 0; i < 5; i++){
+                boards[(k+1) % 2][i] = boards[k%2][i] * (1-alpha) + projected[i] * (2 * alpha) - toProject[i]*alpha;
+            }
+        }
     }
     // avg.projectLine(true,0).printBoard();
     return {false, 0, getMillis() - start};

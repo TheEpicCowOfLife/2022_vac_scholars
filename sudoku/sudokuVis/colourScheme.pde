@@ -20,3 +20,23 @@ public color map_val_to_colour(float val, float lb, float ub, float alpha){
     alpha
   );
 }
+public color map_val_to_colour2(float val, float lb, float ub){
+  colorMode(HSB, 255);
+  
+  return color(
+    map(val, lb, ub, 0, 0), // hue
+    map(val, lb, ub, 0, 0), // saturation
+    map(val, lb, ub, 80, 150), // brightness
+    255
+  );
+}
+public color map_val_to_colour3(float val, float lb, float ub){
+  colorMode(HSB, 255);
+  
+  return color(
+    map(val, lb, ub, 85, 85), // hue
+    map(val, lb, ub, 80, 80), // saturation
+    map(val, lb, ub, 100, 170), // brightness
+    255
+  );
+}

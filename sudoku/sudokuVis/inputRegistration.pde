@@ -26,7 +26,13 @@ void keyPressed(){
       cur_it = max(0, cur_it - 1);
     }
     else if (key == 'e'){
-      roundMode ^= true; 
+      confidenceMode ^= true; 
+    }
+    else if (key == 'a'){
+      displayViolations ^= true;
+    }
+    else if (key == 's'){
+      displayMatchSoln ^= true;
     }
   }  
 }
