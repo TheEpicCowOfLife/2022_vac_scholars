@@ -16,7 +16,7 @@ const int n = 9;
 const int outputFactor = 100; 
 
 // char fileName[1005] = "data/puzzles0_kaggle";
-char fileName[1005] = "data/puzzles2_17_clue";
+const char fileName[1005] = "data/puzzles2_17_clue";
 
 // char fileName[1005] = "data/puzzles3_magictour_top1465";
 // char fileName[105] = "data/puzzles6_forum_hardest_1106";
@@ -28,9 +28,10 @@ int boardsScanned = 100;
 int allBoards[maxBoardsScanned][n][n];
 int constraintBoard[n][n];
 
-const bool defaultDR = false;
+const bool defaultDR = true;
 const float alpha = 0.2;
-
+const bool doExtension = true;
+const float myGamma = 0.5;
 void setConstraintBoard(int k){
     FOR2(
         constraintBoard[i][j] = allBoards[k][i][j];
@@ -88,6 +89,7 @@ struct Board{
 
     Board projectLine(bool discrete, int idx){
         Board projected;
+        // printf("%d", idx);
         FOR2(
             vector<float> v;
 
@@ -291,7 +293,6 @@ Result doBoard(int seed, bool doOutput, FILE * outputFile){
                 }
                 return {true,successfulIteration, getMillis() - start};
             }
-
         }
         if (defaultDR){
             for (int i = 0; i < 4; i++){
@@ -317,6 +318,9 @@ Result doBoard(int seed, bool doOutput, FILE * outputFile){
         }
     }
     // avg.projectLine(true,0).printBoard();
+    if (doOutput){
+        fprintf(outputFile, "-999999\n");
+    }
     return {false, 0, getMillis() - start};
 
 }
@@ -324,6 +328,70 @@ Result doBoard(int seed, bool doOutput, FILE * outputFile){
 Result doBoard(int seed){
     FILE* dummy;
     return doBoard(seed,false,dummy);
+}
+
+Result runExtension(int seed, bool doOutput, FILE * outputFile){
+    srand(seed);
+    long long start = getMillis();
+    if (doOutput){
+        fprintf(outputFile,"%d %d\n", n, outputFactor);
+        for (int i = 0; i < n; i++){
+            for (int j = 0; j < n; j++){
+                fprintf(outputFile, "%d ", constraintBoard[i][j]);
+            }
+            fprintf(outputFile, "\n");
+        }
+    }
+    Board z[4];
+    Board x[5];
+    z[0] = Board(true);
+    int successfulIteration = -1;
+
+    for (int i = 1; i < 4; i++){
+        z[i] = z[0];
+    }
+    for (int k = 0; k < NUM_TICKS; k++){
+        // Calculate x_k
+        x[0] = z[0].projectLine(true,0);
+        for (int i = 1; i < 4; i++){
+            x[i] = (z[i] - z[i-1] + x[i-1]).projectLine(true,i);
+        }
+        x[4] = (x[0] + x[3] - z[3]).projectMaster();
+
+        // Project onto the diagonal space to check stuff
+        Board avg = (x[0] + x[1] + x[2] + x[3] + x[4]) * 0.2;
+
+        if (doOutput){
+            avg.outputBoard(outputFile);
+        }
+        if (avg.projectLine(true,0).check()){
+            if (successfulIteration == -1){
+                successfulIteration = k;
+            }
+            else if (k >= successfulIteration + 10){
+                if (doOutput){
+                    fprintf(outputFile, "-999999\n");
+                }
+                return {true,successfulIteration, getMillis() - start};
+            }
+        }
+
+        // Update z
+        for (int i = 0; i < 4; i++){
+            z[i] = z[i] + (x[i+1] - x[i]) * myGamma;
+        }
+        
+    }
+    if (doOutput){
+        fprintf(outputFile, "-999999\n");
+    }
+    return {false, 0, getMillis() - start};
+
+}
+
+Result runExtension(int seed){
+    FILE* dummy;
+    return runExtension(seed,false,dummy);
 }
 
 void doTrials(){
@@ -335,7 +403,15 @@ void doTrials(){
         FOR2(
             constraintBoard[i][j] = allBoards[k][i][j];
         );
-        Result r = doBoard(k);
+        Result r;
+        if (doExtension){
+            // printf("Running extension!\n");
+            r = runExtension(k);
+        }
+        else{
+            printf("Running vanilla DR\n");
+            r = doBoard(k);
+        }
         printf("Trial (and seed) %d: %d %d %lld\n", k, r.success, r.iterations, r.milliseconds);
         if (r.success){
             avg_it += r.iterations;
@@ -393,7 +469,13 @@ int main(){
     else{
         FILE * anotherVariableNameForAFile = fopen(outputFilename,"w");
         setConstraintBoard(boardNum);
-        Result r = doBoard(seed,true, anotherVariableNameForAFile);
+        Result r;
+        if (doExtension){
+            r = runExtension(seed,true, anotherVariableNameForAFile);
+        }
+        else{
+            r = doBoard(seed,true, anotherVariableNameForAFile);
+        }
         printf("%d %d %lld\n", r.success, r.iterations, r.milliseconds);
         fclose(anotherVariableNameForAFile);
         fflush(stdout);

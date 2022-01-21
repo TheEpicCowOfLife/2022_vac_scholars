@@ -13,13 +13,13 @@ float min_val = 999999;
 float max_val = -999999;
 colourLegend cl;
 int cur_it = 0;
-String filename = "inputs/relaxed.txt";
+String filename = "inputs/extension.txt";
 boolean confidenceMode = false;
 boolean displayViolations = true;
 boolean displayMatchSoln = true;
 boolean recording = false;
 
-int cur_movie = 0;
+int cur_movie = 2;
 color borderColour;
 boolean checkPermutation(int[] perm){
   boolean[] seen = new boolean[n];
