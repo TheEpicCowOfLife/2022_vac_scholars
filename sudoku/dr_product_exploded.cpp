@@ -9,29 +9,66 @@ using namespace std::chrono;
 #define FOR3(x) for (int i = 0; i < n; i++){for (int j = 0; j < n; j++){for (int k = 0; k < n; k++) {x}}}
 #define FOR2(x) for (int i = 0; i < n; i++){for (int j = 0; j < n; j++){x}}
 
-
-const int NUM_TICKS = 10000;
 const int n = 9;
 // To slightly save on storage, we output the board floats as ints: multiplied by this outputFactor.
 const int outputFactor = 100; 
 
+
+// -------------------------------------------------
+// Various modes for this program. Set at least one of these to true.
+
+// Will take in a single board as input from stdin, and output to stdout the following 3 integers:
+// Success Iterations Milliseconds
+// where Success is 1 or 0 depending on whether or not the DR terminated in NUM_TICKS iterations and found a solution
+// Iterations is the number of iterations to find the solution (0 if no solution found)
+// Milliseconds is the amount of time taken to find the solution
+bool automode = false;
+
+// Will run the algorithm on up to maxBoardsScanned boards.
+// Note that the 3 integers it outputs are the same as above, Success Iterations Milliseconds
+// Then it will output a message about the overall statistics.
+bool trialsMode = true;
+
+// Will ask for an output file name, the board number, a seed for the RNG. 
+// Then will run the algorithm on the board, and output each iteration step to a file format for the visualiser.
+// Note that the board number is 0 indexed in the order scanned in. I should make this interface less clunky, but eh.
+bool specificInputMode = false;
+
+//----------------------------------------
+// Various settings for the DR algorithm to be run
+// fileName is the path to the file containing all the sudoku puzzles.
 // char fileName[1005] = "data/puzzles0_kaggle";
-const char fileName[1005] = "data/puzzles2_17_clue";
-
+// char fileName[1005] = "data/puzzles2_17_clue";
+char fileName[1005] = "data/pathological";
 // char fileName[1005] = "data/puzzles3_magictour_top1465";
-// char fileName[105] = "data/puzzles6_forum_hardest_1106";
+// char fileName[1005] = "data/puzzles6_forum_hardest_1106";
 
+// Number of iterations to run the DR
+const int NUM_TICKS = 10000;
 
-bool doRandomisation = false;
+// Maximum number of boards to scan and run. Will only scan less than this amount if there aren't enough boards in the input file.
 const int maxBoardsScanned = 100; 
-int boardsScanned = 100;
-int allBoards[maxBoardsScanned][n][n];
-int constraintBoard[n][n];
 
-const bool defaultDR = true;
-const float alpha = 0.2;
+// Set to true to run the extended (Tam-Malitsky?) algorithm. Gamma is just a constant to be set betwee 0 and 1, but only numbers around 0.5 work best.
 const bool doExtension = true;
 const float myGamma = 0.5;
+
+// True if it is the default, vanilla DR. When false it is a slightly generalised form with an additional paramater, alpha.
+// Default DR is (1/2) * Id + (1/2)*(R_A R_B), whereas the generalised form is (1-a)Id + a(R_A R_B)
+const bool defaultDR = true;
+const float alpha = 0.55;
+
+// If true, then will add a random float uniformly distributed in [-noiseMagnitude, noiseMagnitude] to each cell every iteration.
+bool addNoise = false;
+float noiseMagnitude = 0.01;
+
+// END OF SETTINGS
+// ------------------------------
+
+// Some global variables xd
+int allBoards[maxBoardsScanned][n][n];
+int constraintBoard[n][n];
+int boardsScanned;
 void setConstraintBoard(int k){
     FOR2(
         constraintBoard[i][j] = allBoards[k][i][j];
@@ -238,6 +275,12 @@ struct Board{
             fprintf(outputFile,"\n");
         )
     }
+    
+    void addNoise(){
+        FOR3(
+            b[i][j][k] += randFloat(-noiseMagnitude,noiseMagnitude);
+        )
+    }
 };
 
 struct Result{
@@ -278,7 +321,9 @@ Result doBoard(int seed, bool doOutput, FILE * outputFile){
     Board avg;
     for (int k = 0; k < NUM_TICKS; k++){
         avg = (boards[k%2][0] + boards[k%2][1] + boards[k%2][2] + boards[k%2][3] + boards[k%2][4]) * 0.2;
-
+        if (addNoise){
+            avg.addNoise();
+        }
         if (doOutput){
             avg.outputBoard(outputFile);
         }
@@ -315,6 +360,7 @@ Result doBoard(int seed, bool doOutput, FILE * outputFile){
             for (int i = 0; i < 5; i++){
                 boards[(k+1) % 2][i] = boards[k%2][i] * (1-alpha) + projected[i] * (2 * alpha) - toProject[i]*alpha;
             }
+            
         }
     }
     // avg.projectLine(true,0).printBoard();
@@ -409,7 +455,7 @@ void doTrials(){
             r = runExtension(k);
         }
         else{
-            printf("Running vanilla DR\n");
+            // printf("Running vanilla DR\n");
             r = doBoard(k);
         }
         printf("Trial (and seed) %d: %d %d %lld\n", k, r.success, r.iterations, r.milliseconds);
@@ -429,12 +475,39 @@ void doTrials(){
 FILE * inputFile;
 char outputFilename[155];
 char temps[105];
-int main(){
 
+void parseBoard(char * inputStr, int idx){
+    FOR2(
+        if (inputStr[i * n + j] == '.'){
+            allBoards[idx][i][j] = -1;
+        }
+        else{
+            allBoards[idx][i][j] = inputStr[i*n+j] - '1';
+        }
+    )
+}
+
+int main(){
+    if (automode){
+        char inputStr[1005];
+        scanf("%s", inputStr);
+        parseBoard(inputStr,0);
+        setConstraintBoard(0);
+        Result r;
+        if (doExtension){
+            r = runExtension(0);
+        }
+        else{
+            r = doBoard(0);
+        }
+        printf("%d %d %lld\n", r.success, r.iterations, r.milliseconds);
+        return 0;
+    }
     // Read in boards
     inputFile = fopen(fileName, "r");
+    boardsScanned = maxBoardsScanned;
     for (int _ = 0; _ < maxBoardsScanned; _++){
-        char inputStr[105];
+        char inputStr[1005];
         while (true){
             fscanf(inputFile,"%[^\n]%*c", inputStr);
             if (inputStr[0] != '#'){
@@ -445,43 +518,39 @@ int main(){
             boardsScanned = _;
             break;
         }
-        // printf("%s\n", inputStr);
-        FOR2(
-            if (inputStr[i * n + j] == '.'){
-                allBoards[_][i][j] = -1;
-            }
-            else{
-                allBoards[_][i][j] = inputStr[i*n+j] - '1';
-            }
-        )
+        parseBoard(inputStr, _);
     }
-    // doTrials();
-    // return 0;
-    printf("Enter output file name, board, and seed: ");
-    int boardNum;
-    int seed;
-    scanf("%s %d %d", temps, &seed, &boardNum);
-    sprintf(outputFilename,"sudokuVis/inputs/%s.txt",temps);
-    if (boardNum >= boardsScanned){
-        printf("bro don't mess with the program like that\n");
+
+    if (trialsMode){
+        doTrials();
         return 0;
     }
-    else{
-        FILE * anotherVariableNameForAFile = fopen(outputFilename,"w");
-        setConstraintBoard(boardNum);
-        Result r;
-        if (doExtension){
-            r = runExtension(seed,true, anotherVariableNameForAFile);
+    if (specificInputMode){
+        printf("Enter output file name, board, and seed: ");
+        int boardNum;
+        int seed;
+        scanf("%s %d %d", temps, &seed, &boardNum);
+        sprintf(outputFilename,"sudokuVis/inputs/%s.txt",temps);
+        if (boardNum >= boardsScanned){
+            printf("bro don't mess with the program like that\n");
+            return 0;
         }
         else{
-            r = doBoard(seed,true, anotherVariableNameForAFile);
+            FILE * anotherVariableNameForAFile = fopen(outputFilename,"w");
+            setConstraintBoard(boardNum);
+            Result r;
+            if (doExtension){
+                r = runExtension(seed,true, anotherVariableNameForAFile);
+            }
+            else{
+                r = doBoard(seed,true, anotherVariableNameForAFile);
+            }
+            printf("%d %d %lld\n", r.success, r.iterations, r.milliseconds);
+            fclose(anotherVariableNameForAFile);
+            fflush(stdout);
         }
-        printf("%d %d %lld\n", r.success, r.iterations, r.milliseconds);
-        fclose(anotherVariableNameForAFile);
-        fflush(stdout);
+        return 0;
     }
 
-
-
-
+    printf("Wait what are you doing? Turn on at least one of those options to run the program against any data.");
 }
