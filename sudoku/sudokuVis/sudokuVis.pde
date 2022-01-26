@@ -13,13 +13,21 @@ float min_val = 999999;
 float max_val = -999999;
 colourLegend cl;
 int cur_it = 0;
-String filename = "inputs/extension.txt";
+String filename = "inputs/extensionpathological.txt";
+String renderOutputPrefix = "recordings/extensionpathological";
 boolean confidenceMode = false;
 boolean displayViolations = true;
 boolean displayMatchSoln = true;
+
+// VERY HACKY CODE TO DRAW BOTH DISPLAYS AT ONCE
+// IT ACTUALLY WORKS
+// I AM CHAOS INCARNATE
+boolean drawBoth = true;
+
 boolean recording = false;
 
-int cur_movie = 2;
+
+int cur_movie = 0;
 color borderColour;
 boolean checkPermutation(int[] perm){
   boolean[] seen = new boolean[n];
@@ -126,6 +134,20 @@ void draw() {
   scale(scaling); 
 
   //ellipse(width/2, height/2, 100, 100);
+  for (int _ = 0; _ < 2; _++){
+  if (!drawBoth && _ == 1){
+    break; 
+  }
+  if (drawBoth){
+    
+    if (_ == 0){
+      confidenceMode = true;
+    }
+    else{
+      confidenceMode = false;
+      translate(n * 60 + 30, 0);
+    }
+  }
   if (confidenceMode){
     for (int y = 0; y < n; y++){
       for (int x = 0; x < n; x++){
@@ -194,6 +216,7 @@ void draw() {
       }
     }
   }
+  
   for (int i = 0; i <= sqrtn; i++){
     strokeWeight(6);
     stroke(borderColour);
@@ -250,24 +273,24 @@ void draw() {
       }
     }
   }
-  
+  }
   
   cl.render_bar();
   cl.render_labels();
   textSize(40);
-  textAlign(LEFT);
-  text("Current tick: " + str(cur_it),0, n * 60 + 60);
-
+  if (drawBoth){ 
+    textAlign(CENTER);
+    text("Current tick: " + str(cur_it),-15, n * 60 + 60);
+  }
+  else{
+    textAlign(LEFT);
+    text("Current tick: " + str(cur_it),0, n * 60 + 60);
+  }
   if (recording){
-    if (cur_it == 0 || cur_it == num_iterations-1){
-      for (int i = 0; i < 10; i++){
-        saveFrame("recordings/outputs" + str(cur_movie) + "/####.png");
-      }
-    }
-    else{
-      saveFrame("recordings/outputs" + str(cur_movie) + "/####.png");
-    }
-    if (cur_it == num_iterations-1){
+
+    saveFrame(renderOutputPrefix + str(cur_movie) + "/####.png");
+
+    if (cur_it == min(num_iterations-1,2000)){
       recording = false;
     }
     else{
