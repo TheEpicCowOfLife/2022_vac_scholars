@@ -1,0 +1,13 @@
+Some sets have been deleted due to large file sizes, but i guess I won't need to test on them.
+
+Set 0 is trivial, requires very basic deduction (naked single, etc)
+Set 1 is apparently easy, (to investigate)
+Set 2 is also quite easy, but requires more patterns.
+Sets 3-6 are really hard, requires a lot of brute force deduction. The sets are supposedly ordered in difficulty (not the sudokus inside the grid)
+Set 7 have multiple solutions
+Set 8 have none
+
+pathological is a test case adversarially generated against the DR algorithm. Has low success rate.
+
+With 50k iteration limit:
+Puzzles6: 91/100 successful, Average: 7714.296703 iterations, 0.626044 seconds
