@@ -1,3 +1,5 @@
 nm_queens/visualiser/recordings/*
 *.out
 sudoku/sudokuVis/recordings/*
+*out
+sudoku/sudokuVis/inputs/*
