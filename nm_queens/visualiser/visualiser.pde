@@ -1,14 +1,15 @@
 float heightf;
 float widthf;
 int n;
-final int m = 2;
+final int m = 10;
 float[][][] data;
 int num_iterations;
 float min_val = 999999;
 float max_val = -999999;
 colourLegend cl;
 int cur_it = 0;
-String filename = "20success.out";
+String filename = "inputs/20-10continuous.out";
+String recordingOutput = "recordings/20-10continuous";
 boolean roundMode = false;
 boolean recording = false;
 int cur_movie = 0;
@@ -48,6 +49,7 @@ void setup() {
   } 
   catch (IOException e) {
     e.printStackTrace();
+    exit();
   }
   cl = new colourLegend(n * 50 + 100, n * 25, 30, n * 50, min_val,max_val, "");
   println(min_val);
@@ -120,14 +122,7 @@ void draw() {
     strokeWeight(2);
   }
   if (recording){
-    if (cur_it == 0 || cur_it == num_iterations-1){
-      for (int i = 0; i < 10; i++){
-        saveFrame("recordings/outputs" + str(cur_movie) + "/####.png");
-      }
-    }
-    else{
-      saveFrame("recordings/outputs" + str(cur_movie) + "/####.png");
-    }
+    saveFrame(recordingOutput + "/####.png");
     if (cur_it == num_iterations-1){
       recording = false;
     }

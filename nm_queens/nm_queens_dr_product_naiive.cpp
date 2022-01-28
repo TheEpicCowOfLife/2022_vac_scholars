@@ -11,15 +11,54 @@ using namespace std::chrono;
 int m;
 int N;
 
+// Maximum number of iterations to run.
+const int NUM_TICKS = 5000;
+
+// Two modes:
+// Will read in data of a single board and output it.
+// bool outputBoardMode = true;
+// bool runTrialsMode = false;
+bool outputBoardMode = false;
+bool runTrialsMode = true;
+
+
+// When projecting to the discrete sets, there are multiple possible projections choose from.
+// This option enables random selection of these candidates... in a kinda hacky and non-uniform way.
 bool doRandomisation = false;
+
+// There are many ways we can check if we've successfully solved an instance.
+// If the below is true, it will check it by  projecting it to the discrete horizontal constraint
+// then checking if it satisfies the rest of the constraints
+// Otherwise it just rounds to the nearest integer and then check that.
 bool projectCheckingOptimisation = false;
-bool calcDist = false;
-bool addNoise = false;
+
+// If this is true, it adds a uniformly random float in [-noiseMagnitude,noiseMagnitude] to each cell every iteration
+bool addNoise = true;
 float noiseMagnitude = 0.01;
 
+// If true, then in run trials mode will output the summary in a google-sheets friendly format.
+// I used it for pasting into google sheets.
+// Otherwise will give a more human-readable summary
+bool outputSummaryCSV = false;
+
+// Some misc stuff: If true, will calc the distance^2 from Pd(x_i) to Pc(Pd(x_i)) every iteration
+// In other words it will output the rough "distance^2" from satisfying all constraints to distFilename.
+bool calcDist = false;
 char * distFilename = "output.txt";
+
+float median(vector<float> v){
+
+    int n = v.size();
+    nth_element(v.begin(), v.begin() + n/2, v.end());
+    if (n % 2 == 0){
+        nth_element(v.begin(), v.begin() + n/2 + 1, v.end());
+        return (v[n/2] + v[n/2 + 1])/2.0;
+    }
+    return v[n/2];
+}
+
+
 FILE * distFile;
-const int NUM_TICKS = 1000;
 inline int myRound(float x){
     if (x >= 0.5){
         return 1;
@@ -55,7 +94,7 @@ inline vector<float> projS(vector<float> &v, bool discrete){
             s += v[i];
         }
         for (int i = 0; i < n; i++){
-            res[i] = v[i] + (m-s)/n;
+            res[i] = v[i] + ((float)m-s)/(float)n;
         }
     }
     return res;
@@ -88,7 +127,7 @@ inline vector<float> projH(vector<float> &v, bool discrete){
             s += v[i];
         }
         for (int i = 0; i < n; i++){
-            res[i] = v[i] + min(0.f,(m-s)/n);
+            res[i] = v[i] + min(0.f,((float)m-s)/(float)n);
         }
     }
     return res;
@@ -196,7 +235,23 @@ class Board{
         }
         return result;
     }
+    Board projectIdx(bool discrete, int idx){
+        switch(idx){
+            case 0:
+            return projectHorizontal(discrete);
 
+            case 1:
+            return projectVertical(discrete);
+
+            case 2:
+            return projectDiagonal1(discrete);
+
+            case 3:
+            return projectDiagonal2(discrete);
+        }
+        Board wtf;
+        return wtf;
+    }
     bool check(bool debug){
         bool res = true;
         for (int i = 0; i < n; i++){
@@ -426,6 +481,7 @@ void runTrials(int seed){
     int num_success = 0;
     int num_trials = 100;
     double avg_time = 0;
+    vector<float> mv;
     for (int i = seed; i < num_trials+seed; i++){
         Result r = doBoard(i);
         printf("trial %d: %d %d %lld\n", i, r.success, r.iterations, r.milliseconds);
@@ -433,11 +489,18 @@ void runTrials(int seed){
             avg_it += r.iterations;
             avg_time += r.milliseconds;
             num_success++;
+            mv.push_back(r.iterations);
         }   
     }
     if (num_success > 0){
-        printf("%d/%d successful, Average: %lf iterations, %lf seconds", 
-        num_success, num_trials, avg_it/(double)num_success, avg_time/(double)num_success / 1000.0 );
+        if (outputSummaryCSV){
+            printf("%d/%d successful, Average: %lf iterations, %lf seconds, Median %lf iterations\n", 
+            num_success, num_trials, avg_it/(double)num_success, avg_time/(double)num_success / 1000.0, median(mv));
+        }
+        else{
+            printf("%d/%d,%lf,%lf,%lf\n", 
+            num_success, num_trials, avg_it/(double)num_success, median(mv), avg_time/(double)num_success / 1000.0);
+        }
     }
 }
 
@@ -449,15 +512,19 @@ void runTrials(){
 int main(){
     int seed;
     
-    printf("Enter N, M, seed, and the output file name: ");
-    scanf("%d %d %d %s", &N, &m, &seed, temps);
-    sprintf(filename,"visualiser/%s",temps);
-    FILE * file = fopen(filename, "w");
-    doBoard(seed,true,file);
+    if (outputBoardMode){
+        printf("Enter N, M, seed, and the output file name: ");
+        scanf("%d %d %d %s", &N, &m, &seed, temps);
+        sprintf(filename,"visualiser/inputs/%s.out",temps);
+        FILE * file = fopen(filename, "w");
+        doBoard(seed,true,file);
+        return 0;
+    }
+    if (runTrialsMode){
+        printf("Enter N, M, seed:");
+        scanf("%d %d %d", &N, &m, &seed);
+        runTrials(seed);    
+    }
 
-    // printf("Enter N, M, seed:");
-    // scanf("%d %d %d", &N, &m, &seed);
-    // doBoard(666109);
-    // runTrials(seed);    
 
 }
