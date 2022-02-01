@@ -19,8 +19,11 @@ const int NUM_TICKS = 5000;
 // bool outputBoardMode = true;
 // bool runTrialsMode = false;
 bool outputBoardMode = false;
-bool runTrialsMode = true;
+bool runTrialsMode = false;
+bool collectData = true;
 
+// Number of trials in runTrials mode
+int num_trials = 2;
 
 // When projecting to the discrete sets, there are multiple possible projections choose from.
 // This option enables random selection of these candidates... in a kinda hacky and non-uniform way.
@@ -32,9 +35,14 @@ bool doRandomisation = false;
 // Otherwise it just rounds to the nearest integer and then check that.
 bool projectCheckingOptimisation = false;
 
+bool runExtension = true;
+float myGamma = 0.50;
+
 // If this is true, it adds a uniformly random float in [-noiseMagnitude,noiseMagnitude] to each cell every iteration
-bool addNoise = true;
+bool addNoise = false;
 float noiseMagnitude = 0.01;
+
+
 
 // If true, then in run trials mode will output the summary in a google-sheets friendly format.
 // I used it for pasting into google sheets.
@@ -44,7 +52,9 @@ bool outputSummaryCSV = false;
 // Some misc stuff: If true, will calc the distance^2 from Pd(x_i) to Pc(Pd(x_i)) every iteration
 // In other words it will output the rough "distance^2" from satisfying all constraints to distFilename.
 bool calcDist = false;
-char * distFilename = "output.txt";
+char distFilename[105] = "output.txt";
+char csvFileName[105] = "observations.csv";
+
 
 float median(vector<float> v){
 
@@ -438,8 +448,6 @@ Result doBoard(int seed, bool output, FILE * output_file){
             check = avg.check(false);
         }
         if (check){
-
-
             long long end = getMillis();
             if (output){
                 fprintf(output_file,"-999999\n");
@@ -473,17 +481,94 @@ Result doBoard(int seed){
     return doBoard(seed,false,file);
 }
 
+Result doExtension(int seed, bool output, FILE * output_file){
+    srand(seed);
+    if (output){
+        fprintf(output_file, "%d\n", N);
+    }
+    if (calcDist){
+        distFile = fopen(distFilename,"w");
+    }
+
+    long long start = getMillis();
+
+    Board z[3];
+    Board x[4];
+
+    z[0] = Board(N, true);
+    z[1] = z[0];
+    z[2] = z[0];
+
+    for (int k = 0; k < NUM_TICKS; k++){
+        x[0] = z[0].projectIdx(true, 0);
+        for (int i = 1; i <= 2; i++){
+            x[i] = (z[i] - z[i-1] + x[i-1]).projectIdx(true,i);
+        }
+        x[3] = (x[0] + x[2] - z[2]).projectIdx(true,3);
+        Board avg = (x[0] + x[1] + x[2] + x[3]) * 0.25;
+        if (output){
+            for (int y = 0; y < N; y++){
+                for (int x = 0; x < N; x++){
+                    fprintf(output_file, "%f ", avg.b[x][y]);
+                    
+                }
+                fprintf(output_file,"\n");
+            }
+        }
+
+        bool check;
+        if (projectCheckingOptimisation){
+            check = avg.projectVertical(true).check(false);
+        }
+        else{
+            check = avg.check(false);
+        }
+        if (check){
+            long long end = getMillis();
+            if (output){
+                fprintf(output_file,"-999999\n");
+            }
+            return {true,k, end - start};
+        }
+
+        for (int i = 0; i < 3; i++){
+            z[i] = z[i] + (x[i+1] - x[i]) * myGamma;
+            if (addNoise){
+            z[i].addNoise();
+            }
+        }
+        
+    }
+    if (output){
+        fprintf(output_file,"-999999\n");
+    }
+    return {false,0, getMillis() - start};
+}
+Result doExtension(int seed){
+    return doExtension(seed,false,NULL);
+}
 char temps[105];
 char filename[10005];
+
+FILE * dataCSV;
 
 void runTrials(int seed){
     double avg_it = 0;
     int num_success = 0;
-    int num_trials = 100;
+    
     double avg_time = 0;
     vector<float> mv;
+
+    printf("\n\nn,m: %d %d\nExtension: %d\nprojectCheck:%d\nRandom: %d\n", N, m, runExtension, projectCheckingOptimisation, addNoise);
+
     for (int i = seed; i < num_trials+seed; i++){
-        Result r = doBoard(i);
+        Result r;
+        if (runExtension){
+            r = doExtension(i);
+        }
+        else{
+            r = doBoard(i);
+        }
         printf("trial %d: %d %d %lld\n", i, r.success, r.iterations, r.milliseconds);
         if (r.success){
             avg_it += r.iterations;
@@ -492,14 +577,27 @@ void runTrials(int seed){
             mv.push_back(r.iterations);
         }   
     }
+
     if (num_success > 0){
-        if (outputSummaryCSV){
+        if (!outputSummaryCSV){
             printf("%d/%d successful, Average: %lf iterations, %lf seconds, Median %lf iterations\n", 
             num_success, num_trials, avg_it/(double)num_success, avg_time/(double)num_success / 1000.0, median(mv));
         }
         else{
             printf("%d/%d,%lf,%lf,%lf\n", 
             num_success, num_trials, avg_it/(double)num_success, median(mv), avg_time/(double)num_success / 1000.0);
+        }
+    }
+
+    if (collectData){
+        fprintf(dataCSV,"%d,%d,%d,%d,%d,",
+            N, m, runExtension, projectCheckingOptimisation, addNoise);
+        if (num_success > 0){
+            fprintf(dataCSV,"%d,%lf,%lf,%lf\n",             
+                num_success, avg_it/(double)num_success, median(mv), avg_time/(double)num_success / 1000.0);
+        }        
+        else{
+            fprintf(dataCSV,"\n");
         }
     }
 }
@@ -517,13 +615,49 @@ int main(){
         scanf("%d %d %d %s", &N, &m, &seed, temps);
         sprintf(filename,"visualiser/inputs/%s.out",temps);
         FILE * file = fopen(filename, "w");
+        if (runExtension){
+        doExtension(seed,true,file);
+
+        }
+        else{
         doBoard(seed,true,file);
-        return 0;
+
+        }
+
     }
-    if (runTrialsMode){
+    else if (runTrialsMode){
         printf("Enter N, M, seed:");
         scanf("%d %d %d", &N, &m, &seed);
         runTrials(seed);    
+    }
+    else if (collectData){
+        dataCSV = fopen(csvFileName, "w");
+        fprintf(dataCSV, "N, M, isExtension, projectCheck, randomisation, success, avg it, median it, milliseconds\n");
+        for (int msk = 0; msk < 32; msk++){
+            if ((msk & 3) == 0){
+                N = 20;
+                m = 2;
+            }
+            if ((msk & 3) == 1){
+                N = 50;
+                m = 2;
+            }
+            if ((msk & 3) == 2){
+                N = 20;
+                m = 10;
+            }
+            if ((msk & 3) == 3){
+                N = 50;
+                m = 25;
+            }
+            
+            addNoise = (msk & 4) > 0;
+            projectCheckingOptimisation = (msk&8) > 0;
+            runExtension = (msk&16) > 0;
+            
+            runTrials(0);
+        }
+
     }
 
 
